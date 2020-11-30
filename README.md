@@ -14,8 +14,6 @@ Simply enough, AssemTrix is made up of two words, Assemble and Matrix. This migh
 ## 2. Objectives
 I tried my best to make it easier, though challenging. AssemTrix aims for simple boardgame based puzzle game with a various modes and stages. 
 
-&nbsp;I hope this could be a good chance for trying out what assembly is, despite the difference with actual assembly language.
-
 &nbsp;
 
 -----
