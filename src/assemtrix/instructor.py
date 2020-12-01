@@ -226,11 +226,15 @@ class Encoder:
 
     def encoded(self, _device, text):
         pattern = regex.compile(Instructor.pattern)
-        grouped = pattern.match(text).capturesdict()
+        match = pattern.match(text)
+        if not match:
+            raise InvalidFormatException()
+        grouped = match.capturesdict()
+
         i_name = grouped["instruct"][0]
         instructions = [i for i, value in enumerate(self.instructions) if value.name == i_name]
         if not instructions:
-            raise InstructionNotFoundException
+            raise InstructionNotFoundException()
         op = format(instructions[0], f"0{self.op_size}b")
         addr = ""
 
@@ -351,7 +355,7 @@ class Instructor:
                      LineRelativeRegisterAddress, ColumnRelativeRegisterAddress, MapRelativeRegisterAddress]
     register_base = ["P", "B"]
     prefix = ["PL#", "BL#", "PC#", "BC#", "PM#", "BM#", "PL&", "BL&", "PC&", "BC&", "PM&", "BM&"]
-    pattern = "^(?<instruct>[a-z]+)(?:[\\s]*)((?<address_type>[BP][LCM][#&])(?<address>([A-Z][0-9]*)|([0-9]+,[0-9]+)|([0-9]+))(?:[\\s])*)*"
+    pattern = "^(?:[\\s]*)(?<instruct>[a-z]+)(?:[\\s]*)((?<address_type>[BP][LCM][#&])(?<address>([A-Z][0-9]*)|([0-9]+,[0-9]+)|([0-9]+))(?:[\\s])*)*"
     addressers = [(LineRelativeMemoryAddress, "P"), (LineRelativeMemoryAddress, "B"),
                   (ColumnRelativeMemoryAddress, "P"), (ColumnRelativeMemoryAddress,"B"),
                   (MapRelativeMemoryAddress, "P"), (MapRelativeMemoryAddress, "B"),
