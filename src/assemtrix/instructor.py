@@ -19,8 +19,8 @@ class Position:
     def toMapData(cls, pos, address_range, issigned=True):
         if issigned:
             range = address_range // 2 - 1
-            x = ("0" if pos.x >= 0 else "1") + format(abs(pos.x), f"0{range}b")
-            y = ("0" if pos.y >= 0 else "1") + format(abs(pos.y), f"0{range}b")
+            x = ("0" if pos.x >= 0 else "1") + format(abs(pos.x % range), f"0{range}b")
+            y = ("0" if pos.y >= 0 else "1") + format(abs(pos.y % range), f"0{range}b")
             return int(y[::-1] + x[::-1], 2)
         else:
             range = address_range // 2
@@ -32,9 +32,11 @@ class Position:
     def toLineData(cls, dist, address_range, issigned=True):
         if issigned:
             range = address_range - 1
+            dist %= 2 ** range
             x = ("0" if dist >= 0 else "1") + format(abs(dist), f"0{range}b")
         else:
             range = address_range
+            dist %= 2 ** range
             x = format(abs(dist), f"0{range}b")
         return int(x[::-1], 2)
 
@@ -42,9 +44,11 @@ class Position:
     def toColumnData(cls, dist, address_range, issigned=True):
         if issigned:
             range = address_range - 1
+            dist %= 2 ** range
             x = ("0" if dist >= 0 else "1") + format(abs(dist), f"0{range}b")
         else:
             range = address_range
+            dist %= 2 ** range
             x = format(abs(dist), f"0{range}b")
         return int(x[::-1], 2)
 
@@ -239,7 +243,7 @@ class Encoder:
                 raise AddressTypeNotFoundException(f"Cannot find address type: {address_type}")
 
             addr = format(i, f"0{int(math.ceil(abs(math.log2(len(Instructor.addressers)))))}b")[::-1] + addr
-            print('*', addr)
+            print('*', addresser, addr)
             # if register accessing
             if issubclass(addresser, RegisterAddress):
                 register = grouped["address"][index]
@@ -259,20 +263,22 @@ class Encoder:
                     if len(temp) < 2:
                         raise InvalidFormatException()
                     pos = Position(int(temp[0]), int(temp[1]))
-                    if pos.x > 2 ** self.address_range or pos.y > 2 ** self.address_range:
-                        raise AddressRangeExceedException()
                     addr = format(Position.toMapData(pos, address_range=self.address_range, issigned=True), f"0{self.address_range}b")[::-1] + addr
 
                 # if line addressing
                 elif issubclass(addresser, LineAddress):
                     try:
                         dist = int(data)
-                    except ValueError():
+                    except ValueError:
                         raise InvalidFormatException
-                    if dist > 2 ** self.address_range:
-                        raise AddressRangeExceedException()
                     addr = format(Position.toLineData(dist, address_range=self.address_range, issigned=True), f"0{self.address_range}b")[::-1] + addr
-
+                elif issubclass(addresser, ColumnAddress):
+                    try:
+                        dist = int(data)
+                    except ValueError:
+                        raise InvalidFormatException
+                    addr = format(Position.toColumnData(dist, address_range=self.address_range, issigned=True), f"0{self.address_range}b")[::-1] + addr
+        print(addr)
         return int(addr + op[::-1], 2)
         # return int(addr[::-1] + op[::-1], 2)
 
@@ -348,7 +354,7 @@ class Instructor:
     pattern = "^(?<instruct>[a-z]+)(?:[\\s]*)((?<address_type>[BP][LCM][#&])(?<address>([A-Z][0-9]*)|([0-9]+,[0-9]+)|([0-9]+))(?:[\\s])*)*"
     addressers = [(LineRelativeMemoryAddress, "P"), (LineRelativeMemoryAddress, "B"),
                   (ColumnRelativeMemoryAddress, "P"), (ColumnRelativeMemoryAddress,"B"),
-                  (MapRelativeRegisterAddress, "P"), (MapRelativeRegisterAddress, "B"),
+                  (MapRelativeMemoryAddress, "P"), (MapRelativeMemoryAddress, "B"),
                   (LineRelativeRegisterAddress, "P"), (LineRelativeRegisterAddress, "B"),
                   (ColumnRelativeRegisterAddress, "P"), (ColumnRelativeRegisterAddress, "B"),
                   (MapRelativeRegisterAddress, "P"), (MapRelativeRegisterAddress, "B")]
@@ -413,11 +419,10 @@ if __name__=="__main__":
     print(address.get_source(_device))
 
     print(_device.encoder.instructions)
-    code = _device.encoder.encoded(_device, "inc PC&A")
+    code = _device.encoder.encoded(_device, "inc BL#1025")
     print(code)
     instruction, address = _device.decoder.decoded(_device, code)
     print(instruction.name, type(address), address.get_source)
 
     pattern = regex.compile(Instructor.pattern)
-    grouped = pattern.match("inc PL&A").capturesdict()
-    print(grouped)
+    grouped = pattern.match("inc PL#1").capturesdict()
