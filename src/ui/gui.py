@@ -19,10 +19,10 @@ class MainWindow(QMainWindow):
         QWidget.__init__(self, parent)
         self.mode = _mode
         self.game = None
+        self.isGameRunning = False
         self.InitUI()
 
     def InitUI(self):
-
         # initialize UI actions
         self.InitAction()
 
@@ -30,7 +30,6 @@ class MainWindow(QMainWindow):
         self.InitWindow()
 
     def InitAction(self):
-
         # Game Start
         self.gameStartAction = QAction("Start", self)
         self.gameStartAction.setShortcut('F3')
@@ -111,7 +110,7 @@ class MainWindow(QMainWindow):
 
 
     def onGameStart(self):
-        if self.game is not None:
+        if self.isGameRunning:
             return
 
         self.game = game.AssemTrixGame(self.mode)
@@ -119,33 +118,42 @@ class MainWindow(QMainWindow):
         self.memoryWindow.setEnabled(True)
         self.memoryWindow.setVisible(True)
         self.inputWindow.setEnabled(True)
-
-
+        self.isGameRunning = True
 
     def onGameReset(self):
+        if not self.isGameRunning:
+            return
         self.onGameEnd()
         self.onGameStart()
 
     def onGameShutdown(self):
-        if self.game is None:
+        if not self.isGameRunning:
             return
 
-        del self.game
         self.memoryWindow.setEnabled(False)
         self.memoryWindow.setVisible(False)
         self.inputWindow.setEnabled(False)
+        self.isGameRunning = False
 
     def onInputChanged(self):
         pass
 
     def onInput(self):
-        if self.game is None:
+        if not self.isGameRunning:
             return
-        self.game.userInput(0, self.inputText.Text())
+
+        text = self.inputText.text()
+        try:
+            result = self.game.inst_input(0, text)
+        except Exception as e:
+            print(type(e), e)
+            return
         self.inputText.clear()
+        self.displayText.setText(str(result))
+        self.memoryWindow.updateMemory()
 
     def onProcess(self):
-        if self.game is None:
+        if not self.isGameRunning:
             return
         self.game.step()
 
@@ -181,7 +189,6 @@ class MemoryWindow(QWidget):
         for i in range(self.y):
             for j in range(self.x):
                 self.memoryFrames[i][j].setText(str(int(self._map.memory[i][j])))
-
 
 
     class MemoryFrame(QPushButton):

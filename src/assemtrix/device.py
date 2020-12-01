@@ -95,11 +95,10 @@ class Device:
         self.name = device_info.name
 
         # initialize registers
-        register_names = Device.invisible_registers + Device.visible_registers
+        self.register_names = Device.invisible_registers + Device.visible_registers
         for i in range(2 ** self.register_size - 4):
-            register_names.append("D" + str(i))
-
-        self.registers = {name: Register(memory_size) for name in register_names}
+            self.register_names.append("D" + str(i))
+        self.registers = {name: Register(memory_size) for name in self.register_names}
 
         # add ALU
         self.alu = ALU(self.registers["S"], memory_size)
@@ -134,10 +133,16 @@ class Device:
         elif len(decoded) == 2:
             decoded[0].execute(self, decoded[1], decoded[2])
 
+    def next(self, data):
+        pos = self.read_current()
+        d = self.registers["H"].read()
+        next_pos = inst.Position(pos.x + tf_pos[d][0], pos.y + tf_pos[d][1])
+        self.registers["P"].write(self.encoder.encode_pos(next_pos))
+
     def interrupt(self, device_num):
         self.main_map.throwinterrupt(device_num)
 
-tf_pos = [[0, 1], [1, 0], [0,- 1], [-1, 0]]
+tf_pos = [[1, 0], [0,- 1], [-1, 0],[0, 1]]
 
 
 class RegisterNotFoundException(Exception):

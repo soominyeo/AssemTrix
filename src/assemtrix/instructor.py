@@ -1,4 +1,5 @@
 import math
+import regex
 from assemtrix import device
 
 class Position:
@@ -77,9 +78,11 @@ class Position:
     def toColumnPosition(cls, data, address_range, issigned=True):
         return Position.toLinePosition(data, address_range, issigned).flip()
 
+
 class Address:
     def get_source(self, _device):
         pass
+
 
 # by source
 # determine source
@@ -87,8 +90,8 @@ class MemoryAddress(Address):
     def __init__(self, data):
         self.data = data
 
-    def get_source(self, _device):
-        pass
+    def get_data(self, _device):
+        return data
 
 
 class RegisterAddress(Address):
@@ -96,23 +99,20 @@ class RegisterAddress(Address):
         super().__init__()
         self.reg = reg
 
-    def get_reg(self, _device):
-        return _device.registers[self.reg]
+    def get_data(self, _device):
+        return _device.registers[self.reg].read()
 
 
 # by addressing
 # determine get_pos
 class RelativeAddress(Address):
     def __init__(self, origin, memory_size):
-        super().__init__()
         self.origin = origin
         self.memory_size = memory_size
 
-    def calc_dist(self, _device):
-        return 0
-
     def get_pos(self, _device):
-        return Position.toMapPosition(_device.registers[self.origin].read(), self.memory_size, False) + self.calc_dist(_device)
+        return Position.toMapPosition(_device.registers[self.origin].read(), self.memory_size, False) + self.get_dist(_device)
+
 
 # by shape
 # determine calc_pos
@@ -120,90 +120,68 @@ class ShapeAddress(Address):
     def __init__(self, address_range):
         self.address_range = address_range
 
+
 class LineAddress(ShapeAddress):
-    def calc_pos(self, _device):
+    def get_dist(self, _device):
         return Position.toLinePosition(self.get_data(_device), self.address_range)
 
+
 class ColumnAddress(ShapeAddress):
-    def calc_pos(self, _device):
+    def get_dist(self, _device):
         return Position.toColumnPosition(self.get_data(_device), self.address_range)
 
+
 class MapAddress(ShapeAddress):
-    def calc_pos(self, _device):
+    def get_dist(self, _device):
         return Position.toMapPosition(self.get_data(_device), self.address_range)
 
-class LineRelativeMemoryAddress(LineAddress, RelativeAddress, MemoryAddress):
-    def __init__(self, origin, data, memory_size, address_range):
-        ShapeAddress.__init__(self, address_range)
+
+class RelativeMemoryAddress(RelativeAddress, MemoryAddress):
+    def __init__(self, origin, data, memory_size):
         RelativeAddress.__init__(self, origin, memory_size)
         MemoryAddress.__init__(self, data)
 
-    def calc_dist(self, _device):
-        return self.calc_pos(_device)
 
-    def get_source(self, _device):
-        return _device.main_map[self.get_pos(_device)]
+class RelativeRegisterAddress(RelativeAddress, RegisterAddress):
+    def __init__(self, origin, reg, memory_size):
+        RelativeAddress.__init__(self, origin, memory_size)
+        RegisterAddress.__init__(self, reg)
 
-class ColumnRelativeMemoryAddress(ColumnAddress, RelativeAddress, MemoryAddress):
+
+class LineRelativeMemoryAddress(LineAddress, RelativeMemoryAddress):
     def __init__(self, origin, data, memory_size, address_range):
         ShapeAddress.__init__(self, address_range)
-        RelativeAddress.__init__(self, origin, memory_size)
-        MemoryAddress.__init__(self, data)
+        RelativeMemoryAddress.__init__(self, origin, data, memory_size)
 
-    def calc_dist(self, _device):
-        return self.calc_pos(_device)
 
-    def get_source(self, _device):
-        return _device.main_map[self.get_pos(_device)]
-
-class MapRelativeMemoryAddress(MapAddress, RelativeAddress, MemoryAddress):
+class ColumnRelativeMemoryAddress(ColumnAddress, RelativeMemoryAddress):
     def __init__(self, origin, data, memory_size, address_range):
         ShapeAddress.__init__(self, address_range)
-        RelativeAddress.__init__(self, origin, memory_size)
-        MemoryAddress.__init__(self, data)
+        RelativeMemoryAddress.__init__(self, origin, data, memory_size)
 
-    def calc_dist(self, _device):
-        return self.calc_pos(_device)
 
-    def get_source(self, _device):
-        return _device.main_map[self.get_pos(_device)]
+class MapRelativeMemoryAddress(MapAddress, RelativeMemoryAddress):
+    def __init__(self, origin, data, memory_size, address_range):
+        ShapeAddress.__init__(self, address_range)
+        RelativeMemoryAddress.__init__(self, origin, data, memory_size)
 
-class LineRelativeRegisterAddress(LineAddress, RelativeAddress, RegisterAddress):
+
+class LineRelativeRegisterAddress(LineAddress, RelativeRegisterAddress):
     def __init__(self, origin, reg, memory_size, address_range):
         ShapeAddress.__init__(self, address_range)
-        RelativeAddress.__init__(self, origin, memory_size)
-        RegisterAddress.__init__(self, reg)
+        RelativeRegisterAddress.__init__(self, origin, reg, memory_size)
 
-    def calc_dist(self, _device):
-        return self.calc_pos(_device)
 
-    def get_source(self, _device):
-        return self.get_reg()
-
-class ColumnRelativeRegisterAddress(ColumnAddress, RelativeAddress, RegisterAddress):
+class ColumnRelativeRegisterAddress(ColumnAddress, RelativeRegisterAddress):
     def __init__(self, origin, reg, memory_size, address_range):
         ShapeAddress.__init__(self, address_range)
-        RelativeAddress.__init__(self, origin, memory_size)
-        RegisterAddress.__init__(self, reg)
-
-    def calc_dist(self, _device):
-        return self.calc_pos(_device)
-
-    def get_source(self, _device):
-        return self.get_reg()
+        RelativeRegisterAddress.__init__(self, origin, reg, memory_size)
 
 
-class MapRelativeRegisterAddress(MapAddress, RelativeAddress, RegisterAddress):
+class MapRelativeRegisterAddress(MapAddress, RelativeRegisterAddress):
     def __init__(self, origin, reg, memory_size, address_range):
         ShapeAddress.__init__(self, address_range)
-        RelativeAddress.__init__(self, origin, memory_size)
-        RegisterAddress.__init__(self, reg)
-
-    def calc_dist(self, _device):
-        return self.calc_pos(_device)
-
-    def get_source(self, _device):
-        return self.get_reg()
+        RelativeRegisterAddress.__init__(self, origin, reg, memory_size)
 
 
 class Instruction:
@@ -211,22 +189,26 @@ class Instruction:
         self.operator = operator
         self.name = name
 
+    def execute(self, _device, *addresses):
+        pass
+
     def __str__(self):
         return self.name
 
 
 class NullaryInstruction(Instruction):
-    def execute(self, _device):
+    def execute(self, _device, *addresses):
         self.operator(_device)
 
+
 class UnaryInstruction(Instruction):
-    def execute(self, _device, address):
-        self.operator(_device, address.get_source(_device))
+    def execute(self, _device, *addresses):
+        self.operator(_device, addresses[0].get_source(_device))
 
 
 class BinaryInstruction(Instruction):
-    def execute(self, _device, address_a, address_b):
-        self.operator(_device, address_a.get_source(_device), address_b.get_source(_device))
+    def execute(self, _device, *addresses):
+        self.operator(_device, addresses[0].get_source(_device), addresses[0].get_source(_device))
 
 
 class Encoder:
@@ -238,43 +220,64 @@ class Encoder:
         self.total_size = total_size
         self.memory_size = memory_size
 
-    def encoded(self, _device, instruction, *addresses):
-        if instruction not in self.instructions:
-            raise InstructionNotFoundException(f"There is no instruction {instruction} in {_device}!")
-
-        op = format(self.instructions.index(instruction), f"0{self.op_size}b")
-
+    def encoded(self, _device, text):
+        pattern = regex.compile(Instructor.pattern)
+        grouped = pattern.match(text).capturesdict()
+        i_name = grouped["instruct"][0]
+        instructions = [i for i, value in enumerate(self.instructions) if value.name == i_name]
+        if not instructions:
+            raise InstructionNotFoundException
+        op = format(instructions[0], f"0{self.op_size}b")
         addr = ""
 
-        for address in addresses:
-            prefix = address[:3]
-            index = Instructor.prefix.index(prefix)
-            if index == -1:
-                raise AddressTypeNotFoundException(f"Cannot find address type: {prefix}")
-            addresser = Instructor.addressers[index]
+        for index in range(len(grouped["address_type"])):
+            address_type = grouped["address_type"][index]
+            try:
+                i = Instructor.prefix.index(address_type)
+                addresser = Instructor.addressers[i][0]
+            except ValueError:
+                raise AddressTypeNotFoundException(f"Cannot find address type: {address_type}")
 
-            addr += format(index, f"0{abs(math.log2(len(Instructor.addressers)))}b")
+            addr = format(i, f"0{int(math.ceil(abs(math.log2(len(Instructor.addressers)))))}b")[::-1] + addr
+            print('*', addr)
+            # if register accessing
+            if issubclass(addresser, RegisterAddress):
+                register = grouped["address"][index]
+                try:
+                    register_id = _device.register_names.index(register)
+                except ValueError:
+                    raise device.RegisterNotFoundException(f"Register{register} not found or not accessible.")
+                addr = format(max(register_id - 4, 0), f"0{_device.register_size}b")[::-1] + addr
 
-            if isinstance(addresser[0], RegisterAddress):
-                register_id = _device.registers[4:].index(address[3:])
-                if register_id == -1:
-                    raise device.RegisterNotFoundException(f"Register{address[3:]} not found or not accessible.")
-                addr += format(max(register_id - 4, 0), f"0{_device.register_size}b")
-            elif isinstance(addresser[0], MemoryAddress):
-                temp = address[3:].split(',')
-                if isinstance(addresser[0], MapAddress):
-                    pos = Position(temp[0], temp[1])
-                    if pos.x > self.address_range or pos.y > self.address_range:
-                        raise
-                    addr += format(Position.toMapData(pos=pos, address_range=self.address_range, issigned=True))
-                else:
-                    addr += temp[0]
+            # if memory accessing
+            elif issubclass(addresser, MemoryAddress):
+                data = grouped["address"][index]
 
+                # if map addressing
+                if issubclass(addresser, MapAddress):
+                    temp = data.split(',')
+                    if len(temp) < 2:
+                        raise InvalidFormatException()
+                    pos = Position(int(temp[0]), int(temp[1]))
+                    if pos.x > 2 ** self.address_range or pos.y > 2 ** self.address_range:
+                        raise AddressRangeExceedException()
+                    addr = format(Position.toMapData(pos, address_range=self.address_range, issigned=True), f"0{self.address_range}b")[::-1] + addr
 
-        return int(addr[::-1] + op[::-1], 2)
+                # if line addressing
+                elif issubclass(addresser, LineAddress):
+                    try:
+                        dist = int(data)
+                    except ValueError():
+                        raise InvalidFormatException
+                    if dist > 2 ** self.address_range:
+                        raise AddressRangeExceedException()
+                    addr = format(Position.toLineData(dist, address_range=self.address_range, issigned=True), f"0{self.address_range}b")[::-1] + addr
 
-    def encode_pos(self, data):
-        return Position.toMapPosition(data, self.memory_size, True)
+        return int(addr + op[::-1], 2)
+        # return int(addr[::-1] + op[::-1], 2)
+
+    def encode_pos(self, pos):
+        return Position.toMapData(pos, self.address_range, False)
 
 
 class Decoder:
@@ -288,9 +291,8 @@ class Decoder:
         self.binary = ""
 
     def decoded(self, _device, data):
-        self.binary = reversed(format(data, format(f"0{self.total_size}b")))
-
-        instruction = self.get_op()
+        self.binary = format(data, f"0{self.total_size}b")[::-1]
+        instruction = self.instructions[self.get_op()]
 
         if isinstance(instruction, NullaryInstruction):
             return (instruction)
@@ -303,6 +305,8 @@ class Decoder:
             return instruction, address_a, address_b
 
     def get_sub(self, size):
+        if len(self.binary) < size:
+            raise InvalidFormatException()
         value = int(self.binary[:size], 2)
         self.binary = self.binary[size:]
         return value
@@ -311,19 +315,20 @@ class Decoder:
         return self.get_sub(self.op_size)
 
     def get_address(self, _device):
-        type = self.get_sub(abs(math.log2(len(Instructor.addressers))))
-        address = Address()
-        base = device.Register()
+        type = self.get_sub(math.ceil(abs(math.log2(len(Instructor.addressers)))))
+        address = None
+        base = device.Register(self.memory_size)
 
-        address_type = Instructor.addressers[type]
+        addresser = Instructor.addressers[type]
+        address_type = addresser[0]
         # if relative addressing, get base register
-        if isinstance(address_type, tuple):
-            base = _device.registers[address_type[1]]
-            address_type = address_type[0]
+        if issubclass(address_type, RelativeAddress):
+            base = _device.registers[addresser[1]]
 
             # if register addressing or not
-            if isinstance(address_type, RegisterAddress):
-                reg = _device.registers[self.get_sub(self.address_size)]
+            if issubclass(address_type, RegisterAddress):
+                reg_id = self.get_sub(self.address_size)
+                reg = _device.registers[_device.register_names[reg_id]]
                 address = address_type(origin=base, reg=reg, memory_size=self.memory_size, address_range=self.address_range)
             else:
                 data = self.get_sub(self.address_size)
@@ -340,7 +345,7 @@ class Instructor:
                      LineRelativeRegisterAddress, ColumnRelativeRegisterAddress, MapRelativeRegisterAddress]
     register_base = ["P", "B"]
     prefix = ["PL#", "BL#", "PC#", "BC#", "PM#", "BM#", "PL&", "BL&", "PC&", "BC&", "PM&", "BM&"]
-
+    pattern = "^(?<instruct>[a-z]+)(?:[\\s]*)((?<address_type>[BP][LCM][#&])(?<address>([A-Z][0-9]*)|([0-9]+,[0-9]+)|([0-9]+))(?:[\\s])*)*"
     addressers = [(LineRelativeMemoryAddress, "P"), (LineRelativeMemoryAddress, "B"),
                   (ColumnRelativeMemoryAddress, "P"), (ColumnRelativeMemoryAddress,"B"),
                   (MapRelativeRegisterAddress, "P"), (MapRelativeRegisterAddress, "B"),
@@ -351,7 +356,6 @@ class Instructor:
     def __init__(self, instructions, register_size, address_range, memory_size=None):
         self.instructions = instructions
         op_size = Instructor.get_min_op_size(instructions)
-
         address_size = Instructor.get_min_address_size(address_range, register_size)
         total_size = op_size + address_size * 2
 
@@ -359,7 +363,6 @@ class Instructor:
 
         self.decoder = Decoder(instructions, op_size, address_size, address_range, total_size, self.memory_size)
         self.encoder = Encoder(instructions, op_size, address_size, address_range, total_size, self.memory_size)
-
 
     def get_memory_size(self):
         return self.memory_size
@@ -373,8 +376,9 @@ class Instructor:
     @classmethod
     def get_min_address_size(cls, address_range, register_size):
         address = math.ceil(max(math.log2(address_range), register_size))
-        type = math.ceil(math.log2(len(Instructor.addressers)))
-        return address + type
+        _type = math.ceil(math.log2(len(Instructor.addressers)))
+
+        return address + _type
 
     @classmethod
     def get_min_op_size(cls, instructions: list):
@@ -384,13 +388,36 @@ class Instructor:
 class InstructionNotFoundException(Exception):
     pass
 
+
 class AddressTypeNotFoundException(Exception):
     pass
 
+
 class AddressRangeExceedException(Exception):
     pass
+
+
+class InvalidFormatException(Exception):
+    pass
+
 
 if __name__=="__main__":
     data = Position.toMapData(Position(1,3), 8, True)
     pos = Position.toMapPosition(data, 8, True)
     print(data, pos.x, pos.y)
+
+    from modes import classic
+    classic_mode = classic.ClassicMode()
+    _device = device.Device(classic_mode.devices[0], memory_map=classic_mode.default_map, memory_size=10, address_range=10)
+    address = MapRelativeMemoryAddress(origin="P", data=data, memory_size=10, address_range=5)
+    print(address.get_source(_device))
+
+    print(_device.encoder.instructions)
+    code = _device.encoder.encoded(_device, "inc PC&A")
+    print(code)
+    instruction, address = _device.decoder.decoded(_device, code)
+    print(instruction.name, type(address), address.get_source)
+
+    pattern = regex.compile(Instructor.pattern)
+    grouped = pattern.match("inc PL&A").capturesdict()
+    print(grouped)

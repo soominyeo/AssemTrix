@@ -1,5 +1,5 @@
 from assemtrix import device
-
+from assemtrix import instructor
 
 class MemoryMap:
     def __init__(self, x, y, memory_size, default=0):
@@ -9,11 +9,16 @@ class MemoryMap:
         for i in self.memory:
             for j in i:
                 j.write(default)
-        print(self.memory)
         self.device_table = []
         self.origins = []
+        self.memory_size = memory_size
         self.x = x
         self.y = y
+
+    def read(self, pos):
+        x = pos.x if pos.x < self.x else pos.x % self.x
+        y = pos.y if pos.y < self.y else pos.y % self.y
+        return self.memory[y][x].read()
 
     def add(self, sub_device):
         self.device_table.append(sub_device)
@@ -44,6 +49,7 @@ class Condition:
     def check(self, game):
         if self.check_cond(game):
             self.action.run()
+
 
 class MemoryCondition(Condition):
     def __init__(self, cond_name, pos, value):
@@ -99,7 +105,6 @@ class AssemTrixGame:
     def __init__(self, mode, seed=None, game_map=None):
         self.seed = seed
 
-        print("a")
         # initialize game map
         if game_map is None:
             self.game_map = mode.default_map
@@ -109,7 +114,6 @@ class AssemTrixGame:
         self.device_table = []
         self.memory_size = mode.memory_size
         self.address_range = mode.address_range
-        print(self.game_map)
 
         # initialize devices
         for d_info in mode.devices:
@@ -134,7 +138,6 @@ class AssemTrixGame:
         # connect conditions
         for cond in self.conditions:
             cond.connect(self.actions[cond.cond_name])
-        print(9)
 
         # initialize count
         self.step_count = 0
@@ -161,18 +164,16 @@ class AssemTrixGame:
         for c in self.conditions:
             c.check(self)
 
-    def user_input(self, id, i_name, *address):
+    def inst_input(self, id, text):
         if id not in range(len(self.device_table)):
             raise NameNotFoundException(f"No device [{id}] found.")
         _device = self.device_table[id]
-        _device.encoder.encoded()
+        code = _device.encoder.encoded(_device, text)
+        self.game_map.write(_device.origin, code)
+        return code
 
-
-    def device_input(self, id, str):
-        if id not in range(len(self.device_table)):
-            raise NameNotFoundException(f"No device [{id}] found.")
-        args = str.split(' ')
-        MemoryMap.write(self.device_table[id].get_origin(), args, args[1:])
+    def raw_input(self, id, text):
+        pass
 
     def on_success(self):
         return True

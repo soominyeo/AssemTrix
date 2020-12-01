@@ -63,8 +63,7 @@ class TemplateMode:
         self.register_size = 4
 
     def set_instructions(self):
-        instructions = Instructions()
-        self.instructions_dict = {"name": instructions}
+        self.instructions_dict = {}
 
     def set_conditions(self):
         self.conditions = Conditions()
@@ -77,6 +76,10 @@ class TemplateMode:
         self.actions = Actions()
         self.actions.add_system_action("success", game.AssemTrixGame.on_success)
         self.actions.add_system_action("failure", game.AssemTrixGame.on_failure)
+
+    def bind(self):
+        self.success_cond.connect(self.actions["success"])
+        self.failure_cond.connect(self.actions["failure"])
 
     def set_devices(self):
         self.devices = Devices()
