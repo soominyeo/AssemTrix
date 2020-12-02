@@ -1,6 +1,5 @@
 from assemtrix import instructor as inst
 
-
 class Register:
     def __init__(self, memory_size):
         self.__value = 0
@@ -11,6 +10,9 @@ class Register:
             return -self.__value
         else:
             return self.__value
+
+    def __str__(self):
+        return "Reg:" + str(int(self))
 
     def __and__(self,other):
         return self.__value & other.read
@@ -114,30 +116,36 @@ class Device:
 
     def step(self):
         data = self.read_current()
-        if data == 0:
-            self.registers["P"].write(self.encoder.encode_pos(self.origin))
-            self.registers["H"].reset()
-        else:
-            self.run(data)
+        self.run(data)
 
     def read_current(self):
         pos = self.decoder.get_absolute_pos(self.registers["P"].read())
         return self.main_map.read(pos)
 
     def run(self, data):
-        decoded = self.decoder.decode(data)
-        if len(decoded) <= 1:
+        try:
+            decoded = self.decoder.decoded(self, data)
+        except inst.InvalidFormatException:
+            self.back()
+            return
+        print(decoded)
+        if len(decoded) == 1:
             decoded[0].execute(self)
-        elif len(decoded) == 1:
-            decoded[0].execute(self, decoded[1])
         elif len(decoded) == 2:
+            print('^')
+            decoded[0].execute(self, decoded[1])
+        elif len(decoded) == 3:
             decoded[0].execute(self, decoded[1], decoded[2])
 
-    def next(self, data):
-        pos = self.read_current()
+    def next(self):
+        pos = self.decoder.get_absolute_pos(self.read_current())
         d = self.registers["H"].read()
         next_pos = inst.Position(pos.x + tf_pos[d][0], pos.y + tf_pos[d][1])
         self.registers["P"].write(self.encoder.encode_pos(next_pos))
+
+    def back(self):
+        self.registers["P"].write(self.encoder.encode_pos(self.origin))
+        self.registers["H"].reset()
 
     def interrupt(self, device_num):
         self.main_map.throwinterrupt(device_num)

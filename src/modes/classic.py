@@ -13,11 +13,12 @@ class ClassicMode(mode.TemplateMode):
 
         # main instruction
         instructions = mode.Instructions()
-        instructions.add_instruction(lambda _device, o1, o2: [o1.write(o2.read(), _device.next())], "mov", 2)
-        instructions.add_instruction(lambda _device, o1, o2: [o1.write(o1 + o2), _device.next()], 'add', 2)
-        instructions.add_instruction(lambda _device, o1, o2: [o1.write(o1 - o2), _device.next()], 'sub', 2)
-        instructions.add_instruction(lambda _device, o1: [o1.write(-o1), _device.next()], 'neg', 1)
-        instructions.add_instruction(lambda _device, o1: [o1.write(o1.read() + 1), _device.next()], 'inc', 1)
+        instructions.add_instruction('back', lambda _device: _device.back(), 0)
+        instructions.add_instruction("mov", lambda _device, o1, o2: [o1.write(o2.read(), _device.next())], 2)
+        instructions.add_instruction('add', lambda _device, o1, o2: [o1.write(o1 + o2), _device.next()], 2)
+        instructions.add_instruction('sub', lambda _device, o1, o2: [o1.write(o1 - o2), _device.next()], 2)
+        instructions.add_instruction('neg', lambda _device, o1: [o1.write(-o1), _device.next()], 1)
+        instructions.add_instruction('inc', lambda _device, o1: [o1.write(o1.read() + 1), print(o1.read()), _device.next()], 1)
         self.instructions_dict["main"] = instructions
 
     def set_conditions(self):
@@ -32,7 +33,7 @@ class ClassicMode(mode.TemplateMode):
                                 instructions=self.instructions_dict["main"], register_size=self.register_size)
 
     def set_memory_size(self):
-        self.memory_size = mode.TemplateMode.default_memory_size
+        self.memory_size = 12
 
     def get_default_map(self):
         self.default_map = game.MemoryMap(15, 15, self.memory_size, 0)

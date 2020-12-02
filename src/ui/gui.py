@@ -79,13 +79,13 @@ class MainWindow(QMainWindow):
         self.inputButton.setShortcut('Return')
         self.inputButton.clicked.connect(self.onInput)
 
-        self.processButton = QPushButton("proceed")
-        self.processButton.setShortcut('\\')
-        self.processButton.clicked.connect(self.onProcess)
+        self.proceedButton = QPushButton("proceed")
+        self.proceedButton.setShortcut('\\')
+        self.proceedButton.clicked.connect(self.onProceed)
 
         bbox = QHBoxLayout()
         bbox.addStretch(1)
-        bbox.addWidget(self.processButton)
+        bbox.addWidget(self.proceedButton)
         bbox.addWidget(self.inputButton)
 
 
@@ -152,10 +152,15 @@ class MainWindow(QMainWindow):
         self.displayText.setText(str(result))
         self.memoryWindow.updateMemory()
 
-    def onProcess(self):
+    def onProceed(self):
         if not self.isGameRunning:
             return
-        self.game.step()
+        try:
+            self.game.step()
+        except Exception as e:
+            print(type(e), str(e))
+        self.memoryWindow.updateMemory()
+
 
     def onRepetition(self):
         pass
@@ -175,20 +180,18 @@ class MemoryWindow(QWidget):
 
     def reset(self, _map: game.MemoryMap):
         self._map = _map
-        self.x = _map.x
-        self.y = _map.y
-        self.memoryFrames = [[self.MemoryFrame(self) for j in range(self.y)] for i in range(self.x)]
+        self.memoryFrames = [[self.MemoryFrame(self) for j in range(self._map.y)] for i in range(self._map.x)]
 
-        for i in range(self.y):
-            for j in range(self.x):
+        for i in range(self._map.y):
+            for j in range(self._map.x):
                 self.memoryGrid.addWidget(self.memoryFrames[i][j], i, j, Qt.AlignCenter)
 
         self.updateMemory()
 
     def updateMemory(self):
-        for i in range(self.y):
-            for j in range(self.x):
-                self.memoryFrames[i][j].setText(str(int(self._map.memory[i][j])))
+        for i in range(self._map.y):
+            for j in range(self._map.x):
+                self.memoryFrames[i][j].setText(str(self._map.read_raw(i, j)))
 
 
     class MemoryFrame(QPushButton):
@@ -197,7 +200,7 @@ class MemoryWindow(QWidget):
         def __init__(self, parent):
             super().__init__(parent)
             self.setContentsMargins(0,0,0,0)
-            self.setMaximumSize(50,50)
+            self.setMaximumSize(25,50)
             self.setStyleSheet(MemoryWindow.MemoryFrame.style_default)
 
 

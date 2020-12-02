@@ -15,10 +15,15 @@ class MemoryMap:
         self.x = x
         self.y = y
 
+    def read_raw(self, x, y):
+        return self.read(instructor.Position(x, y))
+
+    def get_memory(self, pos):
+        return self.memory[pos.y % self.y][pos.x % self.x]
+
     def read(self, pos):
-        x = pos.x if pos.x < self.x else pos.x % self.x
-        y = pos.y if pos.y < self.y else pos.y % self.y
-        return self.memory[y][x].read()
+        memory = self.get_memory(pos)
+        return memory.read()
 
     def add(self, sub_device):
         self.device_table.append(sub_device)
@@ -29,7 +34,7 @@ class MemoryMap:
         _device.registers["P"].write(_device.encoder.encode_pos(_device.origin))
 
     def write(self, pos, data):
-        self.memory[pos.x][pos.y] = data
+        self.memory[pos.x][pos.y].write(data)
         if pos in self.origins:
             self.throwinterrupt(self.origins.index(pos))
 
@@ -147,6 +152,7 @@ class AssemTrixGame:
     def step(self):
         self.step_each()
         self.check_cond()
+        self.step_count += 1
 
     def step_until(self, condition: Condition, max_step=0):
         if max_step == 0:
@@ -170,6 +176,7 @@ class AssemTrixGame:
         _device = self.device_table[id]
         code = _device.encoder.encoded(_device, text)
         self.game_map.write(_device.origin, code)
+        self.input_count += 1
         return code
 
     def raw_input(self, id, text):
@@ -188,3 +195,10 @@ class NameNotFoundException(Exception):
 class ActionNotBindedException(Exception):
     pass
 
+
+if __name__=="__main__":
+    from modes import classic
+    mode = classic.ClassicMode()
+    game = AssemTrixGame(mode)
+    game.inst_input(0, "inc BC#1")
+    game.step()

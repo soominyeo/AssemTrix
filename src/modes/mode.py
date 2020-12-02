@@ -2,13 +2,13 @@ from assemtrix import instructor
 from assemtrix import game
 
 class Instructions(list):
-    def add_instruction(self, operator, name, operand):
+    def add_instruction(self, name, operator, operand):
         if operand == 0:
-            instruction = instructor.NullaryInstruction(operator, name)
+            instruction = instructor.NullaryInstruction(name, operator)
         elif operand == 1:
-            instruction = instructor.UnaryInstruction(operator, name)
+            instruction = instructor.UnaryInstruction(name, operator)
         else:
-            instruction = instructor.BinaryInstruction(operator, name)
+            instruction = instructor.BinaryInstruction(name, operator)
         self.append(instruction)
 
 

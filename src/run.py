@@ -8,6 +8,6 @@ if __name__=="__main__":
             cli.run_cli(sys.argv)
         else:
             gui.run_gui(sys.argv)
-    except Exception as e:
-        print(e)
+    finally:
+        pass
 

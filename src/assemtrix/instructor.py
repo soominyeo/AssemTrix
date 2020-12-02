@@ -80,12 +80,15 @@ class Position:
 
     @classmethod
     def toColumnPosition(cls, data, address_range, issigned=True):
-        return Position.toLinePosition(data, address_range, issigned).flip()
+        pos = Position.toLinePosition(data, address_range, issigned)
+        pos.flip()
+        return pos
+
 
 
 class Address:
     def get_source(self, _device):
-        pass
+        return _device.main_map.get_memory(self.get_pos(_device))
 
 
 # by source
@@ -95,7 +98,7 @@ class MemoryAddress(Address):
         self.data = data
 
     def get_data(self, _device):
-        return data
+        return self.data
 
 
 class RegisterAddress(Address):
@@ -115,7 +118,8 @@ class RelativeAddress(Address):
         self.memory_size = memory_size
 
     def get_pos(self, _device):
-        return Position.toMapPosition(_device.registers[self.origin].read(), self.memory_size, False) + self.get_dist(_device)
+        print(self.get_dist(_device))
+        return Position.toMapPosition(self.origin.read(), self.memory_size, False) + self.get_dist(_device)
 
 
 # by shape
@@ -132,6 +136,7 @@ class LineAddress(ShapeAddress):
 
 class ColumnAddress(ShapeAddress):
     def get_dist(self, _device):
+        print('*', Position.toColumnPosition(self.get_data(_device), self.address_range))
         return Position.toColumnPosition(self.get_data(_device), self.address_range)
 
 
@@ -189,7 +194,7 @@ class MapRelativeRegisterAddress(MapAddress, RelativeRegisterAddress):
 
 
 class Instruction:
-    def __init__(self, operator, name):
+    def __init__(self, name, operator):
         self.operator = operator
         self.name = name
 
@@ -207,6 +212,7 @@ class NullaryInstruction(Instruction):
 
 class UnaryInstruction(Instruction):
     def execute(self, _device, *addresses):
+        print("*", addresses[0].get_source(_device))
         self.operator(_device, addresses[0].get_source(_device))
 
 
@@ -301,18 +307,19 @@ class Decoder:
         self.binary = ""
 
     def decoded(self, _device, data):
+        print('*')
         self.binary = format(data, f"0{self.total_size}b")[::-1]
+        print(self.binary)
         instruction = self.instructions[self.get_op()]
-
         if isinstance(instruction, NullaryInstruction):
-            return (instruction)
+            return (instruction,)
         elif isinstance(instruction, UnaryInstruction):
             address = self.get_address(_device)
-            return instruction, address
+            return (instruction, address)
         else:
             address_a = self.get_address(_device)
             address_b = self.get_address(_device)
-            return instruction, address_a, address_b
+            return (instruction, address_a, address_b)
 
     def get_sub(self, size):
         if len(self.binary) < size:
@@ -333,7 +340,7 @@ class Decoder:
         address_type = addresser[0]
         # if relative addressing, get base register
         if issubclass(address_type, RelativeAddress):
-            base = _device.registers[addresser[1]]
+            base = _device.registers[addresser[1][0]]
 
             # if register addressing or not
             if issubclass(address_type, RegisterAddress):
@@ -419,14 +426,15 @@ if __name__=="__main__":
     from modes import classic
     classic_mode = classic.ClassicMode()
     _device = device.Device(classic_mode.devices[0], memory_map=classic_mode.default_map, memory_size=10, address_range=10)
-    address = MapRelativeMemoryAddress(origin="P", data=data, memory_size=10, address_range=5)
+    address = MapRelativeMemoryAddress(origin=_device.registers["P"], data=data, memory_size=10, address_range=5)
     print(address.get_source(_device))
 
     print(_device.encoder.instructions)
-    code = _device.encoder.encoded(_device, "inc BL#1025")
+    code = _device.encoder.encoded(_device, "inc BL#12")
     print(code)
-    instruction, address = _device.decoder.decoded(_device, code)
+    instruction = _device.decoder.decoded(_device, 0)
     print(instruction.name, type(address), address.get_source)
+    print(address.get_pos(_device).y)
 
     pattern = regex.compile(Instructor.pattern)
     grouped = pattern.match("inc PL#1").capturesdict()
