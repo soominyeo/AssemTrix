@@ -1,4 +1,5 @@
 *※ 기한 안에 완료하지 못함, 일단 현재까지의 진행 상황을 Push해 둔 상태*
+*※ 발표 자료만 업로드함*
 
 # What is AssemTrix(abstract)
 AssemTrix is a simple assembly language based game, on a matrix space. We have a Virtual CPU running on a shared memory map along with other devices. 
@@ -19,4 +20,7 @@ I tried my best to make it easier, though challenging. AssemTrix aims for simple
 &nbsp;
 
 -----
-| ***Under Construction*** |
+[Presentation](https://drive.google.com/file/d/1OzV02lnXgT18F3SuKaCFdCGgzEfpEZEF/view?usp=sharing) |
+
+
+
